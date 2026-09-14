@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { ItemNotesSection } from "./item-notes-section";
+import { ItemsBoard } from "./items-board";
 import { DEFAULT_TAGS } from "./default-tags";
 
 type ProjectWithCompany = {
@@ -14,6 +14,7 @@ type ItemWithNotes = {
   id: string;
   name: string;
   image_url: string | null;
+  sort_order: number;
   notes: {
     id: string;
     content: string;
@@ -50,9 +51,29 @@ export default async function ProjectPage({
   const { data: items, error } = (await supabase
     .from("items")
     .select(
-      "id, name, image_url, notes(id, content, tag_id, resolved, tags(name))"
+      "id, name, image_url, sort_order, notes(id, content, tag_id, resolved, tags(name))"
     )
-    .eq("project_id", id)) as { data: ItemWithNotes[] | null; error: { message: string } | null };
+    .eq("project_id", id)
+    .order("sort_order", { ascending: true })) as {
+    data: ItemWithNotes[] | null;
+    error: { message: string } | null;
+  };
+
+  let effectiveItems = items ?? [];
+
+  if (!error && effectiveItems.length === 0) {
+    const { data: seedItem } = (await supabase
+      .from("items")
+      .insert({ project_id: id, name: "", sort_order: 1000 })
+      .select("id, name, image_url, sort_order")
+      .single()) as {
+      data: Omit<ItemWithNotes, "notes"> | null;
+    };
+
+    if (seedItem) {
+      effectiveItems = [{ ...seedItem, notes: [] }];
+    }
+  }
 
   const { data: customTags } = (await supabase
     .from("tags")
@@ -61,7 +82,7 @@ export default async function ProjectPage({
 
   const tags = [...DEFAULT_TAGS, ...(customTags ?? [])];
 
-  const sortedItems = (items ?? []).map((item) => ({
+  const sortedItems = effectiveItems.map((item) => ({
     ...item,
     notes: [...item.notes].sort((a, b) => {
       const aName = a.tags?.name;
@@ -75,7 +96,7 @@ export default async function ProjectPage({
 
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-5xl flex-col items-center py-32 px-16 bg-white dark:bg-black">
+      <main className="flex flex-1 w-full max-w-6xl flex-col items-center py-32 px-16 bg-white dark:bg-black">
         <h1 className="text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
           {project?.companies?.name}
         </h1>
@@ -87,40 +108,7 @@ export default async function ProjectPage({
             Failed to load items: {error.message}
           </p>
         ) : (
-          <table className="mt-6 w-full table-fixed border-separate border-spacing-0 text-left text-zinc-800 dark:text-zinc-200">
-            <thead>
-              <tr className="border-b border-black/[.08] dark:border-white/[.145]">
-                <th className="w-[18%] py-2 pr-4 text-center font-medium">Item</th>
-                <th className="w-[13%] py-2 pr-4 text-center font-medium">Thumbnail</th>
-                <th className="w-[10%] py-2 pr-0.5 text-center font-medium">Tag</th>
-                <th className="w-[5%] py-2 pr-0.5 text-center font-medium" aria-label="Done" />
-                <th className="w-[54%] py-2 pr-4 font-medium">Note</th>
-              </tr>
-            </thead>
-            {sortedItems.map((item) => (
-              <tbody key={item.id}>
-                <tr aria-hidden="true">
-                  <td className="h-3 p-0" colSpan={5} />
-                </tr>
-                <tr>
-                  <td className="p-0" colSpan={5}>
-                    <table className="w-full table-fixed border-separate border-spacing-0 overflow-hidden rounded-xl border border-black/[.08] bg-[#D9D9D9] text-black shadow-sm">
-                      <colgroup>
-                        <col className="w-[18%]" />
-                        <col className="w-[13%]" />
-                        <col className="w-[10%]" />
-                        <col className="w-[5%]" />
-                        <col className="w-[54%]" />
-                      </colgroup>
-                      <tbody>
-                        <ItemNotesSection item={item} projectId={id} tags={tags} />
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            ))}
-          </table>
+          <ItemsBoard items={sortedItems} projectId={id} tags={tags} />
         )}
       </main>
     </div>

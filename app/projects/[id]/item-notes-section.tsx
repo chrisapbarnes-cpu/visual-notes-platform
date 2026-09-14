@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { EditableTag } from "./editable-tag";
 import { EditableNoteText } from "./editable-note-text";
+import { EditableItemName } from "./editable-item-name";
+import { ItemThumbnail } from "./item-thumbnail";
 import { NoteForm } from "./note-form";
 
 type Note = {
@@ -47,10 +49,12 @@ export function ItemNotesSection({
   item,
   projectId,
   tags,
+  autoEditName = false,
 }: {
   item: Item;
   projectId: string;
   tags: { id: string; name: string }[];
+  autoEditName?: boolean;
 }) {
   const router = useRouter();
   const [showCompleted, setShowCompleted] = useState(false);
@@ -77,20 +81,22 @@ export function ItemNotesSection({
                 className="py-2 pr-4 text-center align-middle"
                 rowSpan={totalRows}
               >
-                {item.name}
+                <EditableItemName
+                  itemId={item.id}
+                  name={item.name}
+                  autoEdit={autoEditName}
+                />
               </td>
               <td
-                className="py-2 pr-4 text-center align-middle"
+                className="py-1.5 pr-4 text-center align-middle"
                 rowSpan={totalRows}
               >
-                {item.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    className="mx-auto h-16 w-16 rounded object-cover"
-                  />
-                ) : null}
+                <ItemThumbnail
+                  itemId={item.id}
+                  imageUrl={item.image_url}
+                  itemName={item.name}
+                  projectId={projectId}
+                />
               </td>
             </>
           )}

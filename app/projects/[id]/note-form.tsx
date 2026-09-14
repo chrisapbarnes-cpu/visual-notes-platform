@@ -47,10 +47,11 @@ export function NoteForm({
     router.refresh();
   }
 
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+  async function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
-      inputRef.current?.blur();
+      await submit();
+      inputRef.current?.focus();
     }
   }
 
